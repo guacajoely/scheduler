@@ -1,0 +1,7 @@
+{
+  "name": "scheduler",
+  "private": true,
+  "scripts": {
+    "pre-push": "npm --prefix backend run format && npm --prefix frontend run format && npm --prefix backend run type-check && npm --prefix frontend run type-check"
+  }
+}
