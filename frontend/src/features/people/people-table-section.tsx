@@ -14,6 +14,7 @@ import { API_BASE_URL } from "@/lib/api";
 import { getErrorMessage } from "@/lib/errors";
 import { PeopleTablePagination } from "@/features/people/people-table-pagination";
 import { PeopleTableToolbar } from "@/features/people/people-table-toolbar";
+import { ConfirmDialog } from "@/features/shared/confirm-dialog";
 import type {
   EntityKind,
   PaginatedPeopleResponse,
@@ -33,6 +34,10 @@ export const PeopleTableSection = ({ entityKind }: PeopleTableSectionProps) => {
   const collectionPath = `/api/${entityKind}`;
   const [rows, setRows] = useState<PersonEntity[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [deleteCandidate, setDeleteCandidate] = useState<PersonEntity | null>(
+    null,
+  );
   const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [pageSize] = useState(10);
@@ -82,6 +87,39 @@ export const PeopleTableSection = ({ entityKind }: PeopleTableSectionProps) => {
     void fetchRows();
   }, [loadRows]);
 
+  const handleDelete = async () => {
+    if (!deleteCandidate) {
+      return;
+    }
+
+    setDeletingId(deleteCandidate.id);
+    setError(null);
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}${collectionPath}/${deleteCandidate.id}`,
+        {
+          method: "DELETE",
+          credentials: "include",
+        },
+      );
+      if (!response.ok) {
+        const payloadError = (await response.json().catch(() => null)) as {
+          message?: string;
+        } | null;
+        throw new Error(
+          payloadError?.message ?? `Failed to delete ${entityLabel}`,
+        );
+      }
+
+      await loadRows();
+      setDeleteCandidate(null);
+    } catch (deleteError) {
+      setError(getErrorMessage(deleteError));
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
@@ -121,16 +159,27 @@ export const PeopleTableSection = ({ entityKind }: PeopleTableSectionProps) => {
                     <TableCell>{row.email}</TableCell>
                     <TableCell>{row.phoneNumber}</TableCell>
                     <TableCell>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() =>
-                          void navigate(`/${entityKind}/${row.id}/edit`)
-                        }
-                      >
-                        Edit
-                      </Button>
+                      <div className="flex gap-2">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() =>
+                            void navigate(`/${entityKind}/${row.id}/edit`)
+                          }
+                        >
+                          Edit
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="destructive"
+                          size="sm"
+                          onClick={() => setDeleteCandidate(row)}
+                          disabled={Boolean(deletingId)}
+                        >
+                          {deletingId === row.id ? "Deleting..." : "Delete"}
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))
@@ -149,6 +198,24 @@ export const PeopleTableSection = ({ entityKind }: PeopleTableSectionProps) => {
           }
         />
       </CardContent>
+      <ConfirmDialog
+        open={Boolean(deleteCandidate)}
+        title={`Delete ${entityLabel}?`}
+        description={
+          deleteCandidate
+            ? `Delete ${deleteCandidate.firstName} ${deleteCandidate.lastName}? This cannot be undone.`
+            : ""
+        }
+        confirmLabel="Delete"
+        cancelLabel="Cancel"
+        isConfirming={Boolean(deletingId)}
+        onOpenChange={(open) => {
+          if (!open) {
+            setDeleteCandidate(null);
+          }
+        }}
+        onConfirm={() => void handleDelete()}
+      />
     </Card>
   );
 };
