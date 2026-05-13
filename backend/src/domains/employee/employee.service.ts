@@ -1,17 +1,39 @@
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq, isNull, sql } from "drizzle-orm";
 
 import { db } from "../../db/index.js";
 import { employee } from "../../db/schema.js";
+import type { PaginationQuery } from "../shared/pagination.schema.js";
 import type {
   CreateEmployeeInput,
   UpdateEmployeeInput,
 } from "./employee.schema.js";
 
-export const listEmployees = async () => {
-  return db.query.employee.findMany({
-    where: isNull(employee.deletedAt),
+export const listEmployees = async ({ page, pageSize }: PaginationQuery) => {
+  const offset = (page - 1) * pageSize;
+  const whereClause = isNull(employee.deletedAt);
+
+  const items = await db.query.employee.findMany({
+    where: whereClause,
     orderBy: (table, { asc }) => [asc(table.lastName), asc(table.firstName)],
+    limit: pageSize,
+    offset,
   });
+
+  const [countRow] = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(employee)
+    .where(whereClause);
+
+  const total = Number(countRow?.count ?? 0);
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+
+  return {
+    items,
+    page,
+    pageSize,
+    total,
+    totalPages,
+  };
 };
 
 export const getEmployeeById = async (id: string) => {

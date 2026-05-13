@@ -1,4 +1,4 @@
-import type { RequestHandler } from "express";
+import type { RequestHandler, Response } from "express";
 import type { ZodError, ZodType } from "zod";
 
 type RequestValidationSchemas = {
@@ -12,6 +12,22 @@ const flattenErrors = (error: ZodError) =>
     path: issue.path.join("."),
     message: issue.message,
   }));
+
+export const validateQueryOrRespond = <TQuery>(
+  res: Response,
+  query: unknown,
+  schema: ZodType<TQuery>,
+): TQuery | null => {
+  const result = schema.safeParse(query);
+  if (!result.success) {
+    res.status(400).json({
+      message: "Invalid request query",
+      errors: flattenErrors(result.error),
+    });
+    return null;
+  }
+  return result.data;
+};
 
 export const validateRequest = (
   schemas: RequestValidationSchemas,

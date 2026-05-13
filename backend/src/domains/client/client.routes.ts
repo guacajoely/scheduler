@@ -1,7 +1,11 @@
 import { type Request, Router } from "express";
 
 import { requireAuth } from "../shared/auth.middleware.js";
-import { validateRequest } from "../shared/request-validation.middleware.js";
+import { paginationQuerySchema } from "../shared/pagination.schema.js";
+import {
+  validateQueryOrRespond,
+  validateRequest,
+} from "../shared/request-validation.middleware.js";
 import { replaceClientAssignedSchedule } from "../schedule/schedule-assignment.service.js";
 import {
   replaceClientAssignedScheduleSchema,
@@ -42,9 +46,14 @@ const isClientEmailConflict = (error: unknown) => {
 export const clientRouter = Router();
 clientRouter.use(requireAuth);
 
-clientRouter.get("/clients", async (_req, res, next) => {
+clientRouter.get("/clients", async (req, res, next) => {
   try {
-    const clients = await listClients();
+    const query = validateQueryOrRespond(res, req.query, paginationQuerySchema);
+    if (!query) {
+      return;
+    }
+
+    const clients = await listClients(query);
     res.status(200).json(clients);
   } catch (error) {
     next(error);

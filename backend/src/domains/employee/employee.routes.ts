@@ -1,7 +1,11 @@
 import { type Request, Router } from "express";
 
 import { requireAuth } from "../shared/auth.middleware.js";
-import { validateRequest } from "../shared/request-validation.middleware.js";
+import { paginationQuerySchema } from "../shared/pagination.schema.js";
+import {
+  validateQueryOrRespond,
+  validateRequest,
+} from "../shared/request-validation.middleware.js";
 import {
   createEmployee,
   getEmployeeById,
@@ -37,9 +41,14 @@ const isEmployeeEmailConflict = (error: unknown) => {
 export const employeeRouter = Router();
 employeeRouter.use(requireAuth);
 
-employeeRouter.get("/employees", async (_req, res, next) => {
+employeeRouter.get("/employees", async (req, res, next) => {
   try {
-    const employees = await listEmployees();
+    const query = validateQueryOrRespond(res, req.query, paginationQuerySchema);
+    if (!query) {
+      return;
+    }
+
+    const employees = await listEmployees(query);
     res.status(200).json(employees);
   } catch (error) {
     next(error);
