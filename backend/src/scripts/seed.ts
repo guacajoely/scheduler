@@ -8,6 +8,11 @@ import { user } from "../db/schema.js";
 const ADMIN_EMAIL = "test@email.com";
 const ADMIN_PASSWORD = "password";
 const ADMIN_NAME = "admin";
+const BETTER_AUTH_URL = process.env.BETTER_AUTH_URL;
+
+if (!BETTER_AUTH_URL) {
+  throw new Error("BETTER_AUTH_URL is not set");
+}
 
 const run = async () => {
   const existingUser = await db.query.user.findFirst({
@@ -26,7 +31,7 @@ const run = async () => {
       password: ADMIN_PASSWORD,
     },
     headers: new Headers({
-      origin: process.env.BETTER_AUTH_URL ?? "http://localhost:3000",
+      origin: BETTER_AUTH_URL,
     }),
   });
 

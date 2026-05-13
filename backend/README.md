@@ -32,6 +32,7 @@ npm run seed
 - `npm run format:check` - check formatting only
 - `npm run db:migrate` - apply Drizzle migrations
 - `npm run db:generate` - generate migration files from schema
+- `npm run db:generate:named -- <name>` - generate a named migration
 - `npm run db:push` - push schema directly to DB
 - `npm run db:studio` - open Drizzle Studio
 - `npm run seed` - create default test user
