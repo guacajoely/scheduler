@@ -2,7 +2,8 @@ import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { LoginPage } from "@/features/auth/login-page";
 import { ProtectedRoute } from "@/features/auth/protected-route";
 import { DashboardPage } from "@/features/dashboard/dashboard-page";
-import { CreatePersonPage } from "@/features/people/create-person-page";
+import { PersonDetailsPage } from "@/features/people/person-details-page";
+import { PersonFormPage } from "@/features/people/person-form-page";
 import { LoadingPage } from "@/features/shared/loading-page";
 import type { AuthStatus } from "@/types/auth";
 
@@ -57,7 +58,7 @@ export const AppRoutes = ({
           path="/clients/new"
           element={
             <ProtectedRoute authStatus={authStatus}>
-              <CreatePersonPage entityKind="clients" />
+              <PersonFormPage entityKind="clients" />
             </ProtectedRoute>
           }
         />
@@ -65,7 +66,23 @@ export const AppRoutes = ({
           path="/employees/new"
           element={
             <ProtectedRoute authStatus={authStatus}>
-              <CreatePersonPage entityKind="employees" />
+              <PersonFormPage entityKind="employees" />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/clients/:id"
+          element={
+            <ProtectedRoute authStatus={authStatus}>
+              <PersonDetailsPage entityKind="clients" />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/employees/:id"
+          element={
+            <ProtectedRoute authStatus={authStatus}>
+              <PersonDetailsPage entityKind="employees" />
             </ProtectedRoute>
           }
         />
@@ -73,7 +90,7 @@ export const AppRoutes = ({
           path="/clients/:id/edit"
           element={
             <ProtectedRoute authStatus={authStatus}>
-              <CreatePersonPage entityKind="clients" mode="edit" />
+              <PersonFormPage entityKind="clients" mode="edit" />
             </ProtectedRoute>
           }
         />
@@ -81,7 +98,7 @@ export const AppRoutes = ({
           path="/employees/:id/edit"
           element={
             <ProtectedRoute authStatus={authStatus}>
-              <CreatePersonPage entityKind="employees" mode="edit" />
+              <PersonFormPage entityKind="employees" mode="edit" />
             </ProtectedRoute>
           }
         />

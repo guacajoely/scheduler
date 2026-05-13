@@ -18,15 +18,15 @@ import { emptyPersonForm } from "@/types/people";
 const getEntityLabel = (entityKind: EntityKind) =>
   entityKind === "clients" ? "Client" : "Employee";
 
-type CreatePersonPageProps = {
+type PersonFormPageProps = {
   entityKind: EntityKind;
   mode?: "create" | "edit";
 };
 
-export const CreatePersonPage = ({
+export const PersonFormPage = ({
   entityKind,
   mode = "create",
-}: CreatePersonPageProps) => {
+}: PersonFormPageProps) => {
   const entityLabel = getEntityLabel(entityKind);
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();

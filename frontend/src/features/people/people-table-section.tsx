@@ -61,18 +61,11 @@ export const PeopleTableSection = ({ entityKind }: PeopleTableSectionProps) => {
         throw new Error(`Failed to load ${entityKind}`);
       }
 
-      const payload = (await response.json()) as
-        | PaginatedPeopleResponse
-        | PersonEntity[];
-      const data = Array.isArray(payload) ? payload : payload.items;
-      const totalValue = Array.isArray(payload)
-        ? payload.length
-        : payload.total;
-      const totalPagesValue = Array.isArray(payload) ? 1 : payload.totalPages;
+      const payload = (await response.json()) as PaginatedPeopleResponse;
 
-      setRows(data);
-      setTotal(totalValue);
-      setTotalPages(totalPagesValue);
+      setRows(payload.items);
+      setTotal(payload.total);
+      setTotalPages(payload.totalPages);
     } catch (loadError) {
       setError(getErrorMessage(loadError));
     } finally {
@@ -160,6 +153,16 @@ export const PeopleTableSection = ({ entityKind }: PeopleTableSectionProps) => {
                     <TableCell>{row.phoneNumber}</TableCell>
                     <TableCell>
                       <div className="flex gap-2">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() =>
+                            void navigate(`/${entityKind}/${row.id}`)
+                          }
+                        >
+                          View
+                        </Button>
                         <Button
                           type="button"
                           variant="outline"
