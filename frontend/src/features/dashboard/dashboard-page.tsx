@@ -37,7 +37,7 @@ export const DashboardPage = ({ onLoggedOut }: DashboardPageProps) => {
   };
 
   return (
-    <main className="min-h-screen bg-background p-4 text-foreground">
+    <main className="min-h-screen bg-slate-100 p-4 text-foreground dark:bg-slate-950">
       <div className="mx-auto grid w-full max-w-7xl gap-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">

@@ -55,7 +55,7 @@ export const LoginPage = ({ onSignedIn }: LoginPageProps) => {
   };
 
   return (
-    <main className="grid min-h-screen place-items-center bg-background p-4 text-foreground">
+    <main className="grid min-h-screen place-items-center bg-slate-100 p-4 text-foreground dark:bg-slate-950">
       <Card className="w-full max-w-md">
         <CardHeader>
           <CardTitle>Login</CardTitle>

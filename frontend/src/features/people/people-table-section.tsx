@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table,
@@ -87,8 +88,6 @@ export const PeopleTableSection = ({ entityKind }: PeopleTableSectionProps) => {
         <CardTitle>{entityLabel}s</CardTitle>
         <PeopleTableToolbar
           entityLabel={entityLabel}
-          isLoading={isLoading}
-          onRefresh={() => void loadRows()}
           onCreateNew={() => void navigate(`/${entityKind}/new`)}
         />
       </CardHeader>
@@ -104,12 +103,13 @@ export const PeopleTableSection = ({ entityKind }: PeopleTableSectionProps) => {
                 <TableHead>Last Name</TableHead>
                 <TableHead>Email</TableHead>
                 <TableHead>Phone</TableHead>
+                <TableHead>Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {rows.length === 0 ? (
                 <TableRow>
-                  <TableCell className="text-muted-foreground" colSpan={4}>
+                  <TableCell className="text-muted-foreground" colSpan={5}>
                     {isLoading ? "Loading..." : `No ${entityKind} found`}
                   </TableCell>
                 </TableRow>
@@ -120,6 +120,18 @@ export const PeopleTableSection = ({ entityKind }: PeopleTableSectionProps) => {
                     <TableCell>{row.lastName}</TableCell>
                     <TableCell>{row.email}</TableCell>
                     <TableCell>{row.phoneNumber}</TableCell>
+                    <TableCell>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() =>
+                          void navigate(`/${entityKind}/${row.id}/edit`)
+                        }
+                      >
+                        Edit
+                      </Button>
+                    </TableCell>
                   </TableRow>
                 ))
               )}

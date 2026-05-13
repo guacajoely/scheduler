@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { ChangeEvent, FormEvent } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -8,7 +8,11 @@ import { Label } from "@/components/ui/label";
 import { API_BASE_URL } from "@/lib/api";
 import { getErrorMessage } from "@/lib/errors";
 import { buildPersonPayload } from "@/lib/people";
-import type { EntityKind, PersonFormValues } from "@/types/people";
+import type {
+  EntityKind,
+  PersonEntity,
+  PersonFormValues,
+} from "@/types/people";
 import { emptyPersonForm } from "@/types/people";
 
 const getEntityLabel = (entityKind: EntityKind) =>
@@ -16,15 +20,68 @@ const getEntityLabel = (entityKind: EntityKind) =>
 
 type CreatePersonPageProps = {
   entityKind: EntityKind;
+  mode?: "create" | "edit";
 };
 
-export const CreatePersonPage = ({ entityKind }: CreatePersonPageProps) => {
+export const CreatePersonPage = ({
+  entityKind,
+  mode = "create",
+}: CreatePersonPageProps) => {
   const entityLabel = getEntityLabel(entityKind);
   const navigate = useNavigate();
+  const { id } = useParams<{ id: string }>();
+  const isEditMode = mode === "edit";
+  const missingEditId = isEditMode && !id;
   const [formValues, setFormValues] =
     useState<PersonFormValues>(emptyPersonForm);
+  const [isLoadingInitialData, setIsLoadingInitialData] = useState(
+    isEditMode && Boolean(id),
+  );
   const [isSaving, setIsSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(
+    missingEditId ? `${entityLabel} id is missing` : null,
+  );
+
+  useEffect(() => {
+    if (!isEditMode || !id) {
+      return;
+    }
+
+    const loadPerson = async () => {
+      setError(null);
+      try {
+        const response = await fetch(
+          `${API_BASE_URL}/api/${entityKind}/${id}`,
+          {
+            credentials: "include",
+          },
+        );
+
+        if (!response.ok) {
+          throw new Error(`Failed to load ${entityLabel}`);
+        }
+
+        const person = (await response.json()) as PersonEntity;
+        setFormValues({
+          firstName: person.firstName,
+          lastName: person.lastName,
+          email: person.email,
+          phoneNumber: person.phoneNumber,
+          addressLine1: person.addressLine1,
+          addressLine2: person.addressLine2 ?? "",
+          city: person.city,
+          state: person.state,
+          postalCode: person.postalCode,
+        });
+      } catch (loadError) {
+        setError(getErrorMessage(loadError));
+      } finally {
+        setIsLoadingInitialData(false);
+      }
+    };
+
+    void loadPerson();
+  }, [entityKind, entityLabel, id, isEditMode]);
 
   const onInputChange =
     (field: keyof PersonFormValues) =>
@@ -32,27 +89,37 @@ export const CreatePersonPage = ({ entityKind }: CreatePersonPageProps) => {
       setFormValues((current) => ({ ...current, [field]: event.target.value }));
     };
 
-  const submitCreate = async (event: FormEvent<HTMLFormElement>) => {
+  const submitForm = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setIsSaving(true);
     setError(null);
 
     try {
-      const response = await fetch(`${API_BASE_URL}/api/${entityKind}`, {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
+      if (isEditMode && !id) {
+        throw new Error(`${entityLabel} id is missing`);
+      }
+
+      const response = await fetch(
+        isEditMode
+          ? `${API_BASE_URL}/api/${entityKind}/${id}`
+          : `${API_BASE_URL}/api/${entityKind}`,
+        {
+          method: isEditMode ? "PATCH" : "POST",
+          headers: {
+            "content-type": "application/json",
+          },
+          credentials: "include",
+          body: JSON.stringify(buildPersonPayload(formValues)),
         },
-        credentials: "include",
-        body: JSON.stringify(buildPersonPayload(formValues)),
-      });
+      );
 
       if (!response.ok) {
         const payloadError = (await response.json().catch(() => null)) as {
           message?: string;
         } | null;
         throw new Error(
-          payloadError?.message ?? `Failed to create ${entityLabel}`,
+          payloadError?.message ??
+            `Failed to ${isEditMode ? "update" : "create"} ${entityLabel}`,
         );
       }
 
@@ -65,7 +132,7 @@ export const CreatePersonPage = ({ entityKind }: CreatePersonPageProps) => {
   };
 
   const onSubmit = (event: FormEvent<HTMLFormElement>) => {
-    void submitCreate(event);
+    void submitForm(event);
   };
 
   return (
@@ -73,7 +140,9 @@ export const CreatePersonPage = ({ entityKind }: CreatePersonPageProps) => {
       <div className="mx-auto grid w-full max-w-2xl gap-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle>Create {entityLabel}</CardTitle>
+            <CardTitle>
+              {isEditMode ? `Edit ${entityLabel}` : `Create ${entityLabel}`}
+            </CardTitle>
             <Button
               type="button"
               variant="outline"
@@ -83,6 +152,11 @@ export const CreatePersonPage = ({ entityKind }: CreatePersonPageProps) => {
             </Button>
           </CardHeader>
           <CardContent>
+            {isLoadingInitialData ? (
+              <p className="mb-3 text-sm text-muted-foreground">
+                Loading {entityLabel.toLowerCase()}...
+              </p>
+            ) : null}
             {error ? (
               <p className="mb-3 text-sm text-destructive">{error}</p>
             ) : null}
@@ -188,10 +262,10 @@ export const CreatePersonPage = ({ entityKind }: CreatePersonPageProps) => {
                 </div>
               </div>
 
-              <Button type="submit" disabled={isSaving}>
+              <Button type="submit" disabled={isSaving || isLoadingInitialData}>
                 {isSaving
-                  ? `Creating ${entityLabel}...`
-                  : `Create ${entityLabel}`}
+                  ? `${isEditMode ? "Saving" : "Creating"} ${entityLabel}...`
+                  : `${isEditMode ? "Save" : "Create"} ${entityLabel}`}
               </Button>
             </form>
           </CardContent>
