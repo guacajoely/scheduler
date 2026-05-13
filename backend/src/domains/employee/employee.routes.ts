@@ -1,4 +1,4 @@
-import { Router } from "express";
+import { type Request, Router } from "express";
 
 import { requireAuth } from "../shared/auth.middleware.js";
 import { validateRequest } from "../shared/request-validation.middleware.js";
@@ -49,9 +49,9 @@ employeeRouter.get("/employees", async (_req, res, next) => {
 employeeRouter.get(
   "/employees/:id",
   validateRequest({ params: employeeIdParamsSchema }),
-  async (req, res, next) => {
+  async (req: Request<EmployeeIdParams>, res, next) => {
     try {
-      const { id } = req.params as EmployeeIdParams;
+      const { id } = req.params;
       const found = await getEmployeeById(id);
       if (!found) {
         res.status(404).json({ message: "Employee not found" });
@@ -67,9 +67,13 @@ employeeRouter.get(
 employeeRouter.post(
   "/employees",
   validateRequest({ body: createEmployeeSchema }),
-  async (req, res, next) => {
+  async (
+    req: Request<Record<string, never>, unknown, CreateEmployeeInput>,
+    res,
+    next,
+  ) => {
     try {
-      const created = await createEmployee(req.body as CreateEmployeeInput);
+      const created = await createEmployee(req.body);
       res.status(201).json(created);
     } catch (error) {
       if (isEmployeeEmailConflict(error)) {
@@ -87,10 +91,14 @@ employeeRouter.patch(
     params: employeeIdParamsSchema,
     body: updateEmployeeSchema,
   }),
-  async (req, res, next) => {
+  async (
+    req: Request<EmployeeIdParams, unknown, UpdateEmployeeInput>,
+    res,
+    next,
+  ) => {
     try {
-      const { id } = req.params as EmployeeIdParams;
-      const input = req.body as UpdateEmployeeInput;
+      const { id } = req.params;
+      const input = req.body;
 
       const updated = await updateEmployee(id, input);
       if (!updated) {
@@ -112,9 +120,9 @@ employeeRouter.patch(
 employeeRouter.delete(
   "/employees/:id",
   validateRequest({ params: employeeIdParamsSchema }),
-  async (req, res, next) => {
+  async (req: Request<EmployeeIdParams>, res, next) => {
     try {
-      const { id } = req.params as EmployeeIdParams;
+      const { id } = req.params;
       const deleted = await softDeleteEmployee(id);
       if (!deleted) {
         res.status(404).json({ message: "Employee not found" });

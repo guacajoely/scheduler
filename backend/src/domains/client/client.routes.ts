@@ -1,7 +1,12 @@
-import { Router } from "express";
+import { type Request, Router } from "express";
 
 import { requireAuth } from "../shared/auth.middleware.js";
 import { validateRequest } from "../shared/request-validation.middleware.js";
+import { replaceClientAssignedSchedule } from "../schedule/schedule-assignment.service.js";
+import {
+  replaceClientAssignedScheduleSchema,
+  type ReplaceClientAssignedScheduleInput,
+} from "../schedule/schedule.schema.js";
 import {
   createClient,
   getClientById,
@@ -49,9 +54,9 @@ clientRouter.get("/clients", async (_req, res, next) => {
 clientRouter.get(
   "/clients/:id",
   validateRequest({ params: clientIdParamsSchema }),
-  async (req, res, next) => {
+  async (req: Request<ClientIdParams>, res, next) => {
     try {
-      const { id } = req.params as ClientIdParams;
+      const { id } = req.params;
       const found = await getClientById(id);
       if (!found) {
         res.status(404).json({ message: "Client not found" });
@@ -67,9 +72,13 @@ clientRouter.get(
 clientRouter.post(
   "/clients",
   validateRequest({ body: createClientSchema }),
-  async (req, res, next) => {
+  async (
+    req: Request<Record<string, never>, unknown, CreateClientInput>,
+    res,
+    next,
+  ) => {
     try {
-      const created = await createClient(req.body as CreateClientInput);
+      const created = await createClient(req.body);
       res.status(201).json(created);
     } catch (error) {
       if (isClientEmailConflict(error)) {
@@ -87,10 +96,14 @@ clientRouter.patch(
     params: clientIdParamsSchema,
     body: updateClientSchema,
   }),
-  async (req, res, next) => {
+  async (
+    req: Request<ClientIdParams, unknown, UpdateClientInput>,
+    res,
+    next,
+  ) => {
     try {
-      const { id } = req.params as ClientIdParams;
-      const input = req.body as UpdateClientInput;
+      const { id } = req.params;
+      const input = req.body;
       const updated = await updateClient(id, input);
       if (!updated) {
         res.status(404).json({ message: "Client not found" });
@@ -110,15 +123,49 @@ clientRouter.patch(
 clientRouter.delete(
   "/clients/:id",
   validateRequest({ params: clientIdParamsSchema }),
-  async (req, res, next) => {
+  async (req: Request<ClientIdParams>, res, next) => {
     try {
-      const { id } = req.params as ClientIdParams;
+      const { id } = req.params;
       const deleted = await softDeleteClient(id);
       if (!deleted) {
         res.status(404).json({ message: "Client not found" });
         return;
       }
       res.status(204).send();
+    } catch (error) {
+      next(error);
+    }
+  },
+);
+
+clientRouter.put(
+  "/clients/:id/assigned-schedule",
+  validateRequest({
+    params: clientIdParamsSchema,
+    body: replaceClientAssignedScheduleSchema,
+  }),
+  async (
+    req: Request<ClientIdParams, unknown, ReplaceClientAssignedScheduleInput>,
+    res,
+    next,
+  ) => {
+    try {
+      const { id } = req.params;
+      const result = await replaceClientAssignedSchedule(id, req.body);
+
+      if (!result.ok) {
+        if (result.code === "CLIENT_NOT_FOUND") {
+          res.status(404).json({ message: "Client not found" });
+          return;
+        }
+        res.status(404).json({
+          message: "One or more employees were not found",
+          employeeIds: result.employeeIds,
+        });
+        return;
+      }
+
+      res.status(200).json({ ok: true });
     } catch (error) {
       next(error);
     }
