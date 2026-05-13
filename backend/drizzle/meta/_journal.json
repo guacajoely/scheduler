@@ -8,6 +8,13 @@
       "when": 1778537756587,
       "tag": "0000_init-better-auth-tables",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1778630529183,
+      "tag": "0001_client-employee-schedule-tables",
+      "breakpoints": true
     }
   ]
 }

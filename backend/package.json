@@ -12,6 +12,7 @@
     "start": "node dist/index.js",
     "seed": "tsx src/scripts/seed.ts",
     "db:generate": "drizzle-kit generate",
+    "db:generate:named": "drizzle-kit generate --name",
     "db:migrate": "drizzle-kit migrate",
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
@@ -19,6 +20,7 @@
   },
   "dependencies": {
     "@better-auth/drizzle-adapter": "^1.6.10",
+    "@paralleldrive/cuid2": "^3.3.0",
     "better-auth": "^1.6.10",
     "cors": "^2.8.5",
     "dotenv": "^16.5.0",
