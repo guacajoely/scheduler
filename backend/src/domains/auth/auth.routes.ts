@@ -4,6 +4,7 @@ import {
   Router,
 } from "express";
 
+import { buildAuthRequestHeaders } from "../shared/auth-request-headers.js";
 import { auth } from "./auth.config.js";
 
 type JsonBody = Record<string, unknown> | undefined;
@@ -19,30 +20,10 @@ const buildAuthRequest = (
   body?: JsonBody,
 ) => {
   const url = new URL(`/api/auth${pathname}`, authApiBaseUrl).toString();
-  const headers = new Headers();
+  const headers = buildAuthRequestHeaders(req, authApiBaseUrl.origin);
 
   if (body) {
     headers.set("content-type", "application/json");
-  }
-
-  const cookie = req.headers.cookie;
-  if (cookie) {
-    headers.set("cookie", cookie);
-  }
-
-  const userAgent = req.headers["user-agent"];
-  if (userAgent) {
-    headers.set("user-agent", userAgent);
-  }
-
-  const origin = req.headers.origin ?? authApiBaseUrl.origin;
-  headers.set("origin", origin);
-
-  const xForwardedFor = req.headers["x-forwarded-for"];
-  if (typeof xForwardedFor === "string") {
-    headers.set("x-forwarded-for", xForwardedFor);
-  } else if (Array.isArray(xForwardedFor) && xForwardedFor.length > 0) {
-    headers.set("x-forwarded-for", xForwardedFor[0]);
   }
 
   return new Request(url, {
