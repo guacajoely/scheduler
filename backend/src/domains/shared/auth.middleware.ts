@@ -3,15 +3,19 @@ import type { Request, RequestHandler } from "express";
 import { auth } from "../auth/auth.config.js";
 import { buildAuthRequestHeaders } from "./auth-request-headers.js";
 
-const fallbackAuthOrigin = new URL(
-  process.env.BETTER_AUTH_URL ?? "http://localhost:3000",
-).origin;
+const betterAuthUrl = process.env.BETTER_AUTH_URL;
+
+if (!betterAuthUrl) {
+  throw new Error("BETTER_AUTH_URL is not set");
+}
+
+const betterAuthOrigin = new URL(betterAuthUrl).origin;
 
 export type AuthSession = Awaited<ReturnType<typeof auth.api.getSession>>;
 
 const getSession = async (req: Request) =>
   auth.api.getSession({
-    headers: buildAuthRequestHeaders(req, fallbackAuthOrigin),
+    headers: buildAuthRequestHeaders(req, betterAuthOrigin),
   });
 
 export const requireAuth: RequestHandler = async (req, res, next) => {

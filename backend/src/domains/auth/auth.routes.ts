@@ -9,9 +9,13 @@ import { auth } from "./auth.config.js";
 
 type JsonBody = Record<string, unknown> | undefined;
 
-const authApiBaseUrl = new URL(
-  process.env.BETTER_AUTH_URL ?? "http://localhost:3000",
-);
+const betterAuthUrl = process.env.BETTER_AUTH_URL;
+
+if (!betterAuthUrl) {
+  throw new Error("BETTER_AUTH_URL is not set");
+}
+
+const authApiBaseUrl = new URL(betterAuthUrl);
 
 const buildAuthRequest = (
   req: ExpressRequest,
