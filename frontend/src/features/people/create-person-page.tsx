@@ -1,0 +1,202 @@
+import { useState } from "react";
+import type { ChangeEvent, FormEvent } from "react";
+import { useNavigate } from "react-router-dom";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { API_BASE_URL } from "@/lib/api";
+import { getErrorMessage } from "@/lib/errors";
+import { buildPersonPayload } from "@/lib/people";
+import type { EntityKind, PersonFormValues } from "@/types/people";
+import { emptyPersonForm } from "@/types/people";
+
+const getEntityLabel = (entityKind: EntityKind) =>
+  entityKind === "clients" ? "Client" : "Employee";
+
+type CreatePersonPageProps = {
+  entityKind: EntityKind;
+};
+
+export const CreatePersonPage = ({ entityKind }: CreatePersonPageProps) => {
+  const entityLabel = getEntityLabel(entityKind);
+  const navigate = useNavigate();
+  const [formValues, setFormValues] =
+    useState<PersonFormValues>(emptyPersonForm);
+  const [isSaving, setIsSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const onInputChange =
+    (field: keyof PersonFormValues) =>
+    (event: ChangeEvent<HTMLInputElement>) => {
+      setFormValues((current) => ({ ...current, [field]: event.target.value }));
+    };
+
+  const submitCreate = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setIsSaving(true);
+    setError(null);
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/${entityKind}`, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        credentials: "include",
+        body: JSON.stringify(buildPersonPayload(formValues)),
+      });
+
+      if (!response.ok) {
+        const payloadError = (await response.json().catch(() => null)) as {
+          message?: string;
+        } | null;
+        throw new Error(
+          payloadError?.message ?? `Failed to create ${entityLabel}`,
+        );
+      }
+
+      void navigate("/dashboard", { replace: true });
+    } catch (submitError) {
+      setError(getErrorMessage(submitError));
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const onSubmit = (event: FormEvent<HTMLFormElement>) => {
+    void submitCreate(event);
+  };
+
+  return (
+    <main className="min-h-screen bg-background p-4 text-foreground">
+      <div className="mx-auto grid w-full max-w-2xl gap-4">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <CardTitle>Create {entityLabel}</CardTitle>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => void navigate("/dashboard")}
+            >
+              Back to dashboard
+            </Button>
+          </CardHeader>
+          <CardContent>
+            {error ? (
+              <p className="mb-3 text-sm text-destructive">{error}</p>
+            ) : null}
+            <form className="grid gap-3" onSubmit={onSubmit}>
+              <div className="grid gap-2 md:grid-cols-2">
+                <div className="grid gap-1.5">
+                  <Label htmlFor={`${entityKind}-firstName`}>First name</Label>
+                  <Input
+                    id={`${entityKind}-firstName`}
+                    value={formValues.firstName}
+                    onChange={onInputChange("firstName")}
+                    required
+                  />
+                </div>
+                <div className="grid gap-1.5">
+                  <Label htmlFor={`${entityKind}-lastName`}>Last name</Label>
+                  <Input
+                    id={`${entityKind}-lastName`}
+                    value={formValues.lastName}
+                    onChange={onInputChange("lastName")}
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="grid gap-2 md:grid-cols-2">
+                <div className="grid gap-1.5">
+                  <Label htmlFor={`${entityKind}-email`}>Email</Label>
+                  <Input
+                    id={`${entityKind}-email`}
+                    type="email"
+                    value={formValues.email}
+                    onChange={onInputChange("email")}
+                    required
+                  />
+                </div>
+                <div className="grid gap-1.5">
+                  <Label htmlFor={`${entityKind}-phoneNumber`}>
+                    Phone number
+                  </Label>
+                  <Input
+                    id={`${entityKind}-phoneNumber`}
+                    value={formValues.phoneNumber}
+                    onChange={onInputChange("phoneNumber")}
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="grid gap-1.5">
+                <Label htmlFor={`${entityKind}-addressLine1`}>
+                  Address line 1
+                </Label>
+                <Input
+                  id={`${entityKind}-addressLine1`}
+                  value={formValues.addressLine1}
+                  onChange={onInputChange("addressLine1")}
+                  required
+                />
+              </div>
+
+              <div className="grid gap-1.5">
+                <Label htmlFor={`${entityKind}-addressLine2`}>
+                  Address line 2 (optional)
+                </Label>
+                <Input
+                  id={`${entityKind}-addressLine2`}
+                  value={formValues.addressLine2}
+                  onChange={onInputChange("addressLine2")}
+                />
+              </div>
+
+              <div className="grid gap-2 md:grid-cols-3">
+                <div className="grid gap-1.5">
+                  <Label htmlFor={`${entityKind}-city`}>City</Label>
+                  <Input
+                    id={`${entityKind}-city`}
+                    value={formValues.city}
+                    onChange={onInputChange("city")}
+                    required
+                  />
+                </div>
+                <div className="grid gap-1.5">
+                  <Label htmlFor={`${entityKind}-state`}>State</Label>
+                  <Input
+                    id={`${entityKind}-state`}
+                    value={formValues.state}
+                    onChange={onInputChange("state")}
+                    maxLength={2}
+                    required
+                  />
+                </div>
+                <div className="grid gap-1.5">
+                  <Label htmlFor={`${entityKind}-postalCode`}>
+                    Postal code
+                  </Label>
+                  <Input
+                    id={`${entityKind}-postalCode`}
+                    value={formValues.postalCode}
+                    onChange={onInputChange("postalCode")}
+                    required
+                  />
+                </div>
+              </div>
+
+              <Button type="submit" disabled={isSaving}>
+                {isSaving
+                  ? `Creating ${entityLabel}...`
+                  : `Create ${entityLabel}`}
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
+      </div>
+    </main>
+  );
+};

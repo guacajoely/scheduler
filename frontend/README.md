@@ -24,5 +24,5 @@ App runs at `http://localhost:5173`.
 
 ## Notes
 
-- Frontend API URL is configured with `VITE_API_BASE_URL` (default `http://localhost:3000`).
+- Frontend API URL is configured with `VITE_API_BASE_URL` (required).
 - Keep full-stack/local setup instructions in the repo root `README.md`.
