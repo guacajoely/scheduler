@@ -10,6 +10,12 @@ import { EmployeeRequestedSchedulePicker } from "@/features/people/employee-requ
 import { API_BASE_URL } from "@/lib/api";
 import { getErrorMessage } from "@/lib/errors";
 import { buildPersonPayload } from "@/lib/people";
+import {
+  buildClientRequestedSchedule,
+  createEmptyScheduleRow,
+  parseClientRequestedScheduleRows,
+  parseEmployeeRequestedSchedule,
+} from "@/features/people/person-form-schedule";
 import type {
   ClientRequestedSchedule,
   ClientRequestedScheduleRow,
@@ -18,145 +24,52 @@ import type {
   PersonEntity,
   PersonFormValues,
 } from "@/types/people";
-import { dayOfWeekOptions, emptyPersonForm } from "@/types/people";
+import { emptyPersonForm } from "@/types/people";
 
 const getEntityLabel = (entityKind: EntityKind) =>
   entityKind === "clients" ? "Client" : "Employee";
 
-const isDayOfWeek = (value: unknown): value is DayOfWeek =>
-  dayOfWeekOptions.some((option) => option.value === value);
-
-const createRowId = () => {
-  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
-    return crypto.randomUUID();
-  }
-  return `${Date.now()}-${Math.random()}`;
-};
-
-const createEmptyScheduleRow = (): ClientRequestedScheduleRow => ({
-  id: createRowId(),
-  dayOfWeek: "",
-  startTime: "",
-  endTime: "",
-});
-
-const parseEmployeeRequestedSchedule = (value: unknown): DayOfWeek[] => {
-  if (!Array.isArray(value)) {
-    return [];
-  }
-  return value.filter(isDayOfWeek);
-};
-
-const parseTimeOptionFromStoredTime = (time: unknown): string => {
-  if (typeof time !== "string") {
-    return "";
-  }
-
-  const match = /^([01]\d|2[0-3]):[0-5]\d$/.exec(time);
-  if (!match) {
-    return "";
-  }
-
-  const hour24 = Number(match[1]);
-  const period = hour24 >= 12 ? "PM" : "AM";
-  const hour12 = hour24 % 12 === 0 ? 12 : hour24 % 12;
-  return `${hour12}:00${period}`;
-};
-
-const parseClientRequestedScheduleRows = (
-  value: unknown,
-): ClientRequestedScheduleRow[] => {
-  if (!Array.isArray(value)) {
-    return [createEmptyScheduleRow()];
-  }
-
-  const rows: ClientRequestedScheduleRow[] = [];
-  for (const entry of value) {
-    if (typeof entry !== "object" || entry === null) {
-      continue;
-    }
-    const candidate = entry as {
-      dayOfWeek?: unknown;
-      startTime?: unknown;
-      endTime?: unknown;
-    };
-    if (!isDayOfWeek(candidate.dayOfWeek)) {
-      continue;
-    }
-
-    const startTime = parseTimeOptionFromStoredTime(candidate.startTime);
-    const endTime = parseTimeOptionFromStoredTime(candidate.endTime);
-    rows.push({
-      id: createRowId(),
-      dayOfWeek: candidate.dayOfWeek,
-      startTime,
-      endTime,
-    });
-  }
-
-  return rows.length > 0 ? rows : [createEmptyScheduleRow()];
-};
-
-const toTwentyFourHour = (timeOption: string) => {
-  const match = /^([1-9]|1[0-2]):00(AM|PM)$/.exec(timeOption);
-  if (!match) {
-    throw new Error("Select a valid start and end time");
-  }
-
-  const hour12 = Number(match[1]);
-  const period = match[2];
-  const normalized = hour12 % 12;
-  const hour24 = period === "PM" ? normalized + 12 : normalized;
-  return `${String(hour24).padStart(2, "0")}:00`;
-};
-
-const buildClientRequestedSchedule = (
-  rows: ClientRequestedScheduleRow[],
-): ClientRequestedSchedule => {
-  const result: ClientRequestedSchedule = [];
-  const seenDays = new Set<DayOfWeek>();
-
-  for (const row of rows) {
-    const hasAnyTime =
-      row.startTime.trim().length > 0 || row.endTime.trim().length > 0;
-
-    if (!row.dayOfWeek && !hasAnyTime) {
-      continue;
-    }
-    if (!row.dayOfWeek && hasAnyTime) {
-      throw new Error("Select a day for each requested schedule row");
-    }
-
-    const selectedDay = row.dayOfWeek as DayOfWeek;
-    if (!row.startTime.trim() || !row.endTime.trim()) {
-      const label =
-        dayOfWeekOptions.find((day) => day.value === selectedDay)?.label ??
-        "Selected day";
-      throw new Error(`${label} requires both start and end time`);
-    }
-    if (seenDays.has(selectedDay)) {
-      throw new Error("Each day can only be added once");
-    }
-    seenDays.add(selectedDay);
-
-    const startTime = toTwentyFourHour(row.startTime);
-    const endTime = toTwentyFourHour(row.endTime);
-    if (endTime <= startTime) {
-      const label =
-        dayOfWeekOptions.find((day) => day.value === selectedDay)?.label ??
-        "Selected day";
-      throw new Error(`${label} end time must be after start time`);
-    }
-
-    result.push({ dayOfWeek: selectedDay, startTime, endTime });
-  }
-
-  return result;
-};
-
 type PersonFormPageProps = {
   entityKind: EntityKind;
   mode?: "create" | "edit";
+};
+
+type PersonTextFieldProps = {
+  entityKind: EntityKind;
+  field: keyof PersonFormValues;
+  label: string;
+  value: string;
+  onChange: (
+    field: keyof PersonFormValues,
+  ) => (event: ChangeEvent<HTMLInputElement>) => void;
+  required?: boolean;
+  type?: "text" | "email";
+  maxLength?: number;
+};
+
+const PersonTextField = ({
+  entityKind,
+  field,
+  label,
+  value,
+  onChange,
+  required = true,
+  type = "text",
+  maxLength,
+}: PersonTextFieldProps) => {
+  return (
+    <div className="grid gap-1.5">
+      <Label htmlFor={`${entityKind}-${field}`}>{label}</Label>
+      <Input
+        id={`${entityKind}-${field}`}
+        type={type}
+        value={value}
+        onChange={onChange(field)}
+        required={required}
+        maxLength={maxLength}
+      />
+    </div>
+  );
 };
 
 export const PersonFormPage = ({
@@ -332,104 +245,80 @@ export const PersonFormPage = ({
               onSubmit={(event) => void submitForm(event)}
             >
               <div className="grid gap-2 md:grid-cols-2">
-                <div className="grid gap-1.5">
-                  <Label htmlFor={`${entityKind}-firstName`}>First name</Label>
-                  <Input
-                    id={`${entityKind}-firstName`}
-                    value={formValues.firstName}
-                    onChange={onInputChange("firstName")}
-                    required
-                  />
-                </div>
-                <div className="grid gap-1.5">
-                  <Label htmlFor={`${entityKind}-lastName`}>Last name</Label>
-                  <Input
-                    id={`${entityKind}-lastName`}
-                    value={formValues.lastName}
-                    onChange={onInputChange("lastName")}
-                    required
-                  />
-                </div>
+                <PersonTextField
+                  entityKind={entityKind}
+                  field="firstName"
+                  label="First name"
+                  value={formValues.firstName}
+                  onChange={onInputChange}
+                />
+                <PersonTextField
+                  entityKind={entityKind}
+                  field="lastName"
+                  label="Last name"
+                  value={formValues.lastName}
+                  onChange={onInputChange}
+                />
               </div>
 
               <div className="grid gap-2 md:grid-cols-2">
-                <div className="grid gap-1.5">
-                  <Label htmlFor={`${entityKind}-email`}>Email</Label>
-                  <Input
-                    id={`${entityKind}-email`}
-                    type="email"
-                    value={formValues.email}
-                    onChange={onInputChange("email")}
-                    required
-                  />
-                </div>
-                <div className="grid gap-1.5">
-                  <Label htmlFor={`${entityKind}-phoneNumber`}>
-                    Phone number
-                  </Label>
-                  <Input
-                    id={`${entityKind}-phoneNumber`}
-                    value={formValues.phoneNumber}
-                    onChange={onInputChange("phoneNumber")}
-                    required
-                  />
-                </div>
-              </div>
-
-              <div className="grid gap-1.5">
-                <Label htmlFor={`${entityKind}-addressLine1`}>
-                  Address line 1
-                </Label>
-                <Input
-                  id={`${entityKind}-addressLine1`}
-                  value={formValues.addressLine1}
-                  onChange={onInputChange("addressLine1")}
-                  required
+                <PersonTextField
+                  entityKind={entityKind}
+                  field="email"
+                  label="Email"
+                  value={formValues.email}
+                  onChange={onInputChange}
+                  type="email"
+                />
+                <PersonTextField
+                  entityKind={entityKind}
+                  field="phoneNumber"
+                  label="Phone number"
+                  value={formValues.phoneNumber}
+                  onChange={onInputChange}
                 />
               </div>
 
-              <div className="grid gap-1.5">
-                <Label htmlFor={`${entityKind}-addressLine2`}>
-                  Address line 2 (optional)
-                </Label>
-                <Input
-                  id={`${entityKind}-addressLine2`}
-                  value={formValues.addressLine2}
-                  onChange={onInputChange("addressLine2")}
-                />
-              </div>
+              <PersonTextField
+                entityKind={entityKind}
+                field="addressLine1"
+                label="Address line 1"
+                value={formValues.addressLine1}
+                onChange={onInputChange}
+              />
+
+              <PersonTextField
+                entityKind={entityKind}
+                field="addressLine2"
+                label="Address line 2 (optional)"
+                value={formValues.addressLine2}
+                onChange={onInputChange}
+                required={false}
+              />
 
               <div className="grid gap-2 md:grid-cols-3">
-                <div className="grid gap-1.5">
-                  <Label htmlFor={`${entityKind}-city`}>City</Label>
-                  <Input
-                    id={`${entityKind}-city`}
-                    value={formValues.city}
-                    onChange={onInputChange("city")}
-                    required
-                  />
-                </div>
-                <div className="grid gap-1.5">
-                  <Label htmlFor={`${entityKind}-state`}>State</Label>
-                  <Input
-                    id={`${entityKind}-state`}
-                    value={formValues.state}
-                    onChange={onInputChange("state")}
-                    maxLength={2}
-                    required
-                  />
-                </div>
-                <div className="grid gap-1.5">
-                  <Label htmlFor={`${entityKind}-postalCode`}>
-                    Postal code
-                  </Label>
-                  <Input
-                    id={`${entityKind}-postalCode`}
-                    value={formValues.postalCode}
-                    onChange={onInputChange("postalCode")}
-                    required
-                  />
-                </div>
+                <PersonTextField
+                  entityKind={entityKind}
+                  field="city"
+                  label="City"
+                  value={formValues.city}
+                  onChange={onInputChange}
+                />
+                <PersonTextField
+                  entityKind={entityKind}
+                  field="state"
+                  label="State"
+                  value={formValues.state}
+                  onChange={onInputChange}
+                  maxLength={2}
+                />
+                <PersonTextField
+                  entityKind={entityKind}
+                  field="postalCode"
+                  label="Postal code"
+                  value={formValues.postalCode}
+                  onChange={onInputChange}
+                />
               </div>
 
               {entityKind === "employees" ? (

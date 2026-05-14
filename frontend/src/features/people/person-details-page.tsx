@@ -5,91 +5,18 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { API_BASE_URL } from "@/lib/api";
 import { getErrorMessage } from "@/lib/errors";
 import {
-  dayOfWeekOptions,
-  type ClientRequestedSchedule,
-  type DayOfWeek,
-  type EntityKind,
-  type PersonEntity,
-} from "@/types/people";
+  parseClientRequestedSchedule,
+  parseEmployeeRequestedSchedule,
+} from "@/features/people/person-details-schedule";
+import {
+  dayLabelByValue,
+  formatDisplayTimeFromTwentyFour,
+  sortDayValues,
+} from "@/lib/schedule";
+import { type EntityKind, type PersonEntity } from "@/types/people";
 
 const getEntityLabel = (entityKind: EntityKind) =>
   entityKind === "clients" ? "Client" : "Employee";
-
-const isDayOfWeek = (value: unknown): value is DayOfWeek =>
-  dayOfWeekOptions.some((option) => option.value === value);
-
-const dayLabelByValue: Record<DayOfWeek, string> = {
-  monday: "Monday",
-  tuesday: "Tuesday",
-  wednesday: "Wednesday",
-  thursday: "Thursday",
-  friday: "Friday",
-  saturday: "Saturday",
-  sunday: "Sunday",
-};
-
-const formatDisplayTime = (time: string) => {
-  const match = /^([01]\d|2[0-3]):([0-5]\d)$/.exec(time);
-  if (!match) {
-    return time;
-  }
-  const hour24 = Number(match[1]);
-  const minutes = match[2];
-  const period = hour24 >= 12 ? "PM" : "AM";
-  const hour12 = hour24 % 12 === 0 ? 12 : hour24 % 12;
-  return `${hour12}:${minutes}${period}`;
-};
-
-const parseEmployeeRequestedSchedule = (value: unknown): DayOfWeek[] => {
-  if (!Array.isArray(value)) {
-    return [];
-  }
-  return value.filter(isDayOfWeek);
-};
-
-const parseClientRequestedSchedule = (
-  value: unknown,
-): ClientRequestedSchedule => {
-  if (!Array.isArray(value)) {
-    return [];
-  }
-
-  const parsed = value
-    .map((entry) => {
-      if (typeof entry !== "object" || entry === null) {
-        return null;
-      }
-
-      const candidate = entry as {
-        dayOfWeek?: unknown;
-        startTime?: unknown;
-        endTime?: unknown;
-      };
-
-      if (
-        !isDayOfWeek(candidate.dayOfWeek) ||
-        typeof candidate.startTime !== "string" ||
-        typeof candidate.endTime !== "string"
-      ) {
-        return null;
-      }
-
-      return {
-        dayOfWeek: candidate.dayOfWeek,
-        startTime: candidate.startTime,
-        endTime: candidate.endTime,
-      };
-    })
-    .filter(
-      (entry): entry is ClientRequestedSchedule[number] => entry !== null,
-    );
-
-  return parsed.sort(
-    (a, b) =>
-      dayOfWeekOptions.findIndex((day) => day.value === a.dayOfWeek) -
-      dayOfWeekOptions.findIndex((day) => day.value === b.dayOfWeek),
-  );
-};
 
 type PersonDetailsPageProps = {
   entityKind: EntityKind;
@@ -135,11 +62,7 @@ export const PersonDetailsPage = ({ entityKind }: PersonDetailsPageProps) => {
 
   const requestedEmployeeDays =
     person && entityKind === "employees"
-      ? parseEmployeeRequestedSchedule(person.requestedSchedule).sort(
-          (a, b) =>
-            dayOfWeekOptions.findIndex((day) => day.value === a) -
-            dayOfWeekOptions.findIndex((day) => day.value === b),
-        )
+      ? sortDayValues(parseEmployeeRequestedSchedule(person.requestedSchedule))
       : [];
 
   const requestedClientSchedule =
@@ -236,8 +159,12 @@ export const PersonDetailsPage = ({ entityKind }: PersonDetailsPageProps) => {
                             className="grid grid-cols-[1.2fr_1fr_1fr] gap-2"
                           >
                             <p>{dayLabelByValue[entry.dayOfWeek]}</p>
-                            <p>{formatDisplayTime(entry.startTime)}</p>
-                            <p>{formatDisplayTime(entry.endTime)}</p>
+                            <p>
+                              {formatDisplayTimeFromTwentyFour(entry.startTime)}
+                            </p>
+                            <p>
+                              {formatDisplayTimeFromTwentyFour(entry.endTime)}
+                            </p>
                           </div>
                         ))}
                       </div>

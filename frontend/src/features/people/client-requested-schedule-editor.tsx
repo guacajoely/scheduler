@@ -1,17 +1,15 @@
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { dayLabelByValue, dayOrderIndex } from "@/lib/schedule";
 import { dayOfWeekOptions } from "@/types/people";
-import type { ClientRequestedScheduleRow, DayOfWeek } from "@/types/people";
-
-const dayOrderIndex: Record<DayOfWeek, number> = {
-  monday: 0,
-  tuesday: 1,
-  wednesday: 2,
-  thursday: 3,
-  friday: 4,
-  saturday: 5,
-  sunday: 6,
-};
+import type { ClientRequestedScheduleRow } from "@/types/people";
 
 const timeOptions = [
   ...Array.from({ length: 23 }, (_, index) => index + 1),
@@ -106,60 +104,73 @@ export const ClientRequestedScheduleEditor = ({
             key={row.id}
             className="grid grid-cols-[1.4fr_1fr_1fr_5rem] items-center gap-2"
           >
-            <select
-              className="h-9 rounded-md border bg-background px-2 text-left text-sm [text-align-last:left]"
-              value={row.dayOfWeek}
-              onChange={(event) =>
+            <Select
+              value={row.dayOfWeek || undefined}
+              onValueChange={(value) =>
                 updateRow(
                   row.id,
                   "dayOfWeek",
-                  event.target.value as ClientRequestedScheduleRow["dayOfWeek"],
+                  value as ClientRequestedScheduleRow["dayOfWeek"],
                 )
               }
             >
-              <option value="">Select day</option>
-              {dayOfWeekOptions
-                .filter(
-                  (day) =>
-                    day.value === row.dayOfWeek ||
-                    !usedDays.includes(day.value),
-                )
-                .map((day) => (
-                  <option key={day.value} value={day.value}>
-                    {day.label}
-                  </option>
+              <SelectTrigger className="h-9 w-full">
+                <SelectValue placeholder="Select day">
+                  {row.dayOfWeek
+                    ? dayLabelByValue[row.dayOfWeek]
+                    : "Select day"}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                {dayOfWeekOptions
+                  .filter(
+                    (day) =>
+                      day.value === row.dayOfWeek ||
+                      !usedDays.includes(day.value),
+                  )
+                  .map((day) => (
+                    <SelectItem key={day.value} value={day.value}>
+                      {day.label}
+                    </SelectItem>
+                  ))}
+              </SelectContent>
+            </Select>
+
+            <Select
+              value={row.startTime || undefined}
+              onValueChange={(value) =>
+                updateRow(row.id, "startTime", value ?? "")
+              }
+            >
+              <SelectTrigger className="h-9 w-full">
+                <SelectValue placeholder="Select time" />
+              </SelectTrigger>
+              <SelectContent>
+                {timeOptions.map((time) => (
+                  <SelectItem key={time} value={time}>
+                    {time}
+                  </SelectItem>
                 ))}
-            </select>
+              </SelectContent>
+            </Select>
 
-            <select
-              className="h-9 rounded-md border bg-background px-2 text-left text-sm [text-align-last:left]"
-              value={row.startTime}
-              onChange={(event) =>
-                updateRow(row.id, "startTime", event.target.value)
+            <Select
+              value={row.endTime || undefined}
+              onValueChange={(value) =>
+                updateRow(row.id, "endTime", value ?? "")
               }
             >
-              <option value="">Select time</option>
-              {timeOptions.map((time) => (
-                <option key={time} value={time}>
-                  {time}
-                </option>
-              ))}
-            </select>
-
-            <select
-              className="h-9 rounded-md border bg-background px-2 text-left text-sm [text-align-last:left]"
-              value={row.endTime}
-              onChange={(event) =>
-                updateRow(row.id, "endTime", event.target.value)
-              }
-            >
-              <option value="">Select time</option>
-              {timeOptions.map((time) => (
-                <option key={time} value={time}>
-                  {time}
-                </option>
-              ))}
-            </select>
+              <SelectTrigger className="h-9 w-full">
+                <SelectValue placeholder="Select time" />
+              </SelectTrigger>
+              <SelectContent>
+                {timeOptions.map((time) => (
+                  <SelectItem key={time} value={time}>
+                    {time}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
 
             <Button
               type="button"
