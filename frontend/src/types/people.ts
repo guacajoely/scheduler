@@ -22,11 +22,47 @@ export type ClientRequestedScheduleEntry = {
 
 export type ClientRequestedSchedule = ClientRequestedScheduleEntry[];
 
+export type PersonSummary = {
+  id: string;
+  firstName: string;
+  lastName: string;
+};
+
 export type ClientRequestedScheduleRow = {
   id: string;
   dayOfWeek: DayOfWeek | "";
   startTime: string;
   endTime: string;
+};
+
+export type ClientAssignedScheduleEntry = {
+  dayOfWeek: DayOfWeek;
+  startTime: string;
+  endTime: string;
+  employeeId: string;
+  employeeName: string;
+};
+
+export type EmployeeAssignedScheduleEntry = {
+  dayOfWeek: DayOfWeek;
+  startTime: string;
+  endTime: string;
+  clientId: string;
+  clientName: string;
+};
+
+export type ClientAssignedScheduleResponse = {
+  weekOf: string;
+  schedule: ClientAssignedScheduleEntry[];
+};
+
+export type EmployeeAssignedScheduleResponse = {
+  weekOf: string;
+  schedule: EmployeeAssignedScheduleEntry[];
+};
+
+export type EmployeesAvailableByDayResponse = {
+  availableEmployeesByDay: Record<DayOfWeek, PersonSummary[]>;
 };
 
 export type PersonEntity = {

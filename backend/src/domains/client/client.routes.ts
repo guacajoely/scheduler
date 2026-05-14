@@ -6,11 +6,6 @@ import {
   validateQueryOrRespond,
   validateRequest,
 } from "../shared/request-validation.middleware.js";
-import { replaceClientAssignedSchedule } from "../schedule/schedule-assignment.service.js";
-import {
-  replaceClientAssignedScheduleSchema,
-  type ReplaceClientAssignedScheduleInput,
-} from "../schedule/schedule.schema.js";
 import {
   createClient,
   getClientById,
@@ -141,40 +136,6 @@ clientRouter.delete(
         return;
       }
       res.status(204).send();
-    } catch (error) {
-      next(error);
-    }
-  },
-);
-
-clientRouter.put(
-  "/clients/:id/assigned-schedule",
-  validateRequest({
-    params: clientIdParamsSchema,
-    body: replaceClientAssignedScheduleSchema,
-  }),
-  async (
-    req: Request<ClientIdParams, unknown, ReplaceClientAssignedScheduleInput>,
-    res,
-    next,
-  ) => {
-    try {
-      const { id } = req.params;
-      const result = await replaceClientAssignedSchedule(id, req.body);
-
-      if (!result.ok) {
-        if (result.code === "CLIENT_NOT_FOUND") {
-          res.status(404).json({ message: "Client not found" });
-          return;
-        }
-        res.status(404).json({
-          message: "One or more employees were not found",
-          employeeIds: result.employeeIds,
-        });
-        return;
-      }
-
-      res.status(200).json({ ok: true });
     } catch (error) {
       next(error);
     }

@@ -2,6 +2,7 @@ import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { LoginPage } from "@/features/auth/login-page";
 import { ProtectedRoute } from "@/features/auth/protected-route";
 import { DashboardPage } from "@/features/dashboard/dashboard-page";
+import { ClientScheduleAssignerPage } from "@/features/people/client-schedule-assigner-page";
 import { PersonDetailsPage } from "@/features/people/person-details-page";
 import { PersonFormPage } from "@/features/people/person-form-page";
 import { LoadingPage } from "@/features/shared/loading-page";
@@ -91,6 +92,14 @@ export const AppRoutes = ({
           element={
             <ProtectedRoute authStatus={authStatus}>
               <PersonFormPage entityKind="clients" mode="edit" />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/clients/:id/assign-schedule"
+          element={
+            <ProtectedRoute authStatus={authStatus}>
+              <ClientScheduleAssignerPage />
             </ProtectedRoute>
           }
         />

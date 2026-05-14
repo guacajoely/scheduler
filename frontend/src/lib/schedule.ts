@@ -1,3 +1,5 @@
+import { addWeeks, format, startOfWeek } from "date-fns";
+
 import { dayOfWeekOptions } from "@/types/people";
 import type { DayOfWeek } from "@/types/people";
 
@@ -74,4 +76,14 @@ export const toTwentyFourHourFromTimeOption = (timeOption: string): string => {
   const normalized = hour12 % 12;
   const hour24 = period === "PM" ? normalized + 12 : normalized;
   return `${String(hour24).padStart(2, "0")}:00`;
+};
+
+export const getScheduleWeekBounds = (currentDate = new Date()) => {
+  const currentMonday = startOfWeek(currentDate, { weekStartsOn: 1 });
+  const nextMonday = addWeeks(currentMonday, 1);
+
+  return {
+    currentWeekOf: format(currentMonday, "yyyy-MM-dd"),
+    nextWeekOf: format(nextMonday, "yyyy-MM-dd"),
+  };
 };
