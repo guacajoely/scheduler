@@ -1,6 +1,6 @@
 # Frontend
 
-React + Vite + TypeScript + Tailwind.
+React + Vite + TypeScript + Tailwind + ShadCN UI.
 
 ## Run
 
@@ -25,4 +25,5 @@ App runs at `http://localhost:5173`.
 ## Notes
 
 - Frontend API URL is configured with `VITE_API_BASE_URL` (required).
+- UI primitives/components are based on ShadCN patterns and live under `src/components/ui`.
 - Keep full-stack/local setup instructions in the repo root `README.md`.

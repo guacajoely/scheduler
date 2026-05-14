@@ -1,5 +1,34 @@
 export type EntityKind = "clients" | "employees";
 
+export const dayOfWeekOptions = [
+  { value: "monday", label: "Monday" },
+  { value: "tuesday", label: "Tuesday" },
+  { value: "wednesday", label: "Wednesday" },
+  { value: "thursday", label: "Thursday" },
+  { value: "friday", label: "Friday" },
+  { value: "saturday", label: "Saturday" },
+  { value: "sunday", label: "Sunday" },
+] as const;
+
+export type DayOfWeek = (typeof dayOfWeekOptions)[number]["value"];
+
+export type EmployeeRequestedSchedule = DayOfWeek[];
+
+export type ClientRequestedScheduleEntry = {
+  dayOfWeek: DayOfWeek;
+  startTime: string;
+  endTime: string;
+};
+
+export type ClientRequestedSchedule = ClientRequestedScheduleEntry[];
+
+export type ClientRequestedScheduleRow = {
+  id: string;
+  dayOfWeek: DayOfWeek | "";
+  startTime: string;
+  endTime: string;
+};
+
 export type PersonEntity = {
   id: string;
   firstName: string;
@@ -11,6 +40,7 @@ export type PersonEntity = {
   city: string;
   state: string;
   postalCode: string;
+  requestedSchedule?: EmployeeRequestedSchedule | ClientRequestedSchedule;
   createdAt: string;
   updatedAt: string;
 };

@@ -5,18 +5,154 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { ClientRequestedScheduleEditor } from "@/features/people/client-requested-schedule-editor";
+import { EmployeeRequestedSchedulePicker } from "@/features/people/employee-requested-schedule-picker";
 import { API_BASE_URL } from "@/lib/api";
 import { getErrorMessage } from "@/lib/errors";
 import { buildPersonPayload } from "@/lib/people";
 import type {
+  ClientRequestedSchedule,
+  ClientRequestedScheduleRow,
+  DayOfWeek,
   EntityKind,
   PersonEntity,
   PersonFormValues,
 } from "@/types/people";
-import { emptyPersonForm } from "@/types/people";
+import { dayOfWeekOptions, emptyPersonForm } from "@/types/people";
 
 const getEntityLabel = (entityKind: EntityKind) =>
   entityKind === "clients" ? "Client" : "Employee";
+
+const isDayOfWeek = (value: unknown): value is DayOfWeek =>
+  dayOfWeekOptions.some((option) => option.value === value);
+
+const createRowId = () => {
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+    return crypto.randomUUID();
+  }
+  return `${Date.now()}-${Math.random()}`;
+};
+
+const createEmptyScheduleRow = (): ClientRequestedScheduleRow => ({
+  id: createRowId(),
+  dayOfWeek: "",
+  startTime: "",
+  endTime: "",
+});
+
+const parseEmployeeRequestedSchedule = (value: unknown): DayOfWeek[] => {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return value.filter(isDayOfWeek);
+};
+
+const parseTimeOptionFromStoredTime = (time: unknown): string => {
+  if (typeof time !== "string") {
+    return "";
+  }
+
+  const match = /^([01]\d|2[0-3]):[0-5]\d$/.exec(time);
+  if (!match) {
+    return "";
+  }
+
+  const hour24 = Number(match[1]);
+  const period = hour24 >= 12 ? "PM" : "AM";
+  const hour12 = hour24 % 12 === 0 ? 12 : hour24 % 12;
+  return `${hour12}:00${period}`;
+};
+
+const parseClientRequestedScheduleRows = (
+  value: unknown,
+): ClientRequestedScheduleRow[] => {
+  if (!Array.isArray(value)) {
+    return [createEmptyScheduleRow()];
+  }
+
+  const rows: ClientRequestedScheduleRow[] = [];
+  for (const entry of value) {
+    if (typeof entry !== "object" || entry === null) {
+      continue;
+    }
+    const candidate = entry as {
+      dayOfWeek?: unknown;
+      startTime?: unknown;
+      endTime?: unknown;
+    };
+    if (!isDayOfWeek(candidate.dayOfWeek)) {
+      continue;
+    }
+
+    const startTime = parseTimeOptionFromStoredTime(candidate.startTime);
+    const endTime = parseTimeOptionFromStoredTime(candidate.endTime);
+    rows.push({
+      id: createRowId(),
+      dayOfWeek: candidate.dayOfWeek,
+      startTime,
+      endTime,
+    });
+  }
+
+  return rows.length > 0 ? rows : [createEmptyScheduleRow()];
+};
+
+const toTwentyFourHour = (timeOption: string) => {
+  const match = /^([1-9]|1[0-2]):00(AM|PM)$/.exec(timeOption);
+  if (!match) {
+    throw new Error("Select a valid start and end time");
+  }
+
+  const hour12 = Number(match[1]);
+  const period = match[2];
+  const normalized = hour12 % 12;
+  const hour24 = period === "PM" ? normalized + 12 : normalized;
+  return `${String(hour24).padStart(2, "0")}:00`;
+};
+
+const buildClientRequestedSchedule = (
+  rows: ClientRequestedScheduleRow[],
+): ClientRequestedSchedule => {
+  const result: ClientRequestedSchedule = [];
+  const seenDays = new Set<DayOfWeek>();
+
+  for (const row of rows) {
+    const hasAnyTime =
+      row.startTime.trim().length > 0 || row.endTime.trim().length > 0;
+
+    if (!row.dayOfWeek && !hasAnyTime) {
+      continue;
+    }
+    if (!row.dayOfWeek && hasAnyTime) {
+      throw new Error("Select a day for each requested schedule row");
+    }
+
+    const selectedDay = row.dayOfWeek as DayOfWeek;
+    if (!row.startTime.trim() || !row.endTime.trim()) {
+      const label =
+        dayOfWeekOptions.find((day) => day.value === selectedDay)?.label ??
+        "Selected day";
+      throw new Error(`${label} requires both start and end time`);
+    }
+    if (seenDays.has(selectedDay)) {
+      throw new Error("Each day can only be added once");
+    }
+    seenDays.add(selectedDay);
+
+    const startTime = toTwentyFourHour(row.startTime);
+    const endTime = toTwentyFourHour(row.endTime);
+    if (endTime <= startTime) {
+      const label =
+        dayOfWeekOptions.find((day) => day.value === selectedDay)?.label ??
+        "Selected day";
+      throw new Error(`${label} end time must be after start time`);
+    }
+
+    result.push({ dayOfWeek: selectedDay, startTime, endTime });
+  }
+
+  return result;
+};
 
 type PersonFormPageProps = {
   entityKind: EntityKind;
@@ -34,6 +170,11 @@ export const PersonFormPage = ({
   const missingEditId = isEditMode && !id;
   const [formValues, setFormValues] =
     useState<PersonFormValues>(emptyPersonForm);
+  const [employeeRequestedSchedule, setEmployeeRequestedSchedule] = useState<
+    DayOfWeek[]
+  >([]);
+  const [clientRequestedScheduleRows, setClientRequestedScheduleRows] =
+    useState<ClientRequestedScheduleRow[]>(() => [createEmptyScheduleRow()]);
   const [isLoadingInitialData, setIsLoadingInitialData] = useState(
     isEditMode && Boolean(id),
   );
@@ -56,7 +197,6 @@ export const PersonFormPage = ({
             credentials: "include",
           },
         );
-
         if (!response.ok) {
           throw new Error(`Failed to load ${entityLabel}`);
         }
@@ -73,6 +213,16 @@ export const PersonFormPage = ({
           state: person.state,
           postalCode: person.postalCode,
         });
+
+        if (entityKind === "employees") {
+          setEmployeeRequestedSchedule(
+            parseEmployeeRequestedSchedule(person.requestedSchedule),
+          );
+        } else {
+          setClientRequestedScheduleRows(
+            parseClientRequestedScheduleRows(person.requestedSchedule),
+          );
+        }
       } catch (loadError) {
         setError(getErrorMessage(loadError));
       } finally {
@@ -89,11 +239,31 @@ export const PersonFormPage = ({
       setFormValues((current) => ({ ...current, [field]: event.target.value }));
     };
 
+  const onEmployeeDayToggle = (day: DayOfWeek, checked: boolean) => {
+    setEmployeeRequestedSchedule((current) => {
+      if (checked) {
+        return current.includes(day) ? current : [...current, day];
+      }
+      return current.filter((value) => value !== day);
+    });
+  };
+
   const submitForm = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    setIsSaving(true);
     setError(null);
 
+    let requestedSchedulePayload: DayOfWeek[] | ClientRequestedSchedule;
+    try {
+      requestedSchedulePayload =
+        entityKind === "employees"
+          ? employeeRequestedSchedule
+          : buildClientRequestedSchedule(clientRequestedScheduleRows);
+    } catch (validationError) {
+      setError(getErrorMessage(validationError));
+      return;
+    }
+
+    setIsSaving(true);
     try {
       if (isEditMode && !id) {
         throw new Error(`${entityLabel} id is missing`);
@@ -105,11 +275,12 @@ export const PersonFormPage = ({
           : `${API_BASE_URL}/api/${entityKind}`,
         {
           method: isEditMode ? "PATCH" : "POST",
-          headers: {
-            "content-type": "application/json",
-          },
+          headers: { "content-type": "application/json" },
           credentials: "include",
-          body: JSON.stringify(buildPersonPayload(formValues)),
+          body: JSON.stringify({
+            ...buildPersonPayload(formValues),
+            requestedSchedule: requestedSchedulePayload,
+          }),
         },
       );
 
@@ -131,13 +302,9 @@ export const PersonFormPage = ({
     }
   };
 
-  const onSubmit = (event: FormEvent<HTMLFormElement>) => {
-    void submitForm(event);
-  };
-
   return (
     <main className="min-h-screen bg-background p-4 text-foreground">
-      <div className="mx-auto grid w-full max-w-2xl gap-4">
+      <div className="mx-auto grid w-full max-w-3xl gap-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle>
@@ -160,7 +327,10 @@ export const PersonFormPage = ({
             {error ? (
               <p className="mb-3 text-sm text-destructive">{error}</p>
             ) : null}
-            <form className="grid gap-3" onSubmit={onSubmit}>
+            <form
+              className="grid gap-3"
+              onSubmit={(event) => void submitForm(event)}
+            >
               <div className="grid gap-2 md:grid-cols-2">
                 <div className="grid gap-1.5">
                   <Label htmlFor={`${entityKind}-firstName`}>First name</Label>
@@ -261,6 +431,24 @@ export const PersonFormPage = ({
                   />
                 </div>
               </div>
+
+              {entityKind === "employees" ? (
+                <EmployeeRequestedSchedulePicker
+                  selectedDays={employeeRequestedSchedule}
+                  onToggleDay={onEmployeeDayToggle}
+                />
+              ) : (
+                <ClientRequestedScheduleEditor
+                  rows={clientRequestedScheduleRows}
+                  onRowsChange={setClientRequestedScheduleRows}
+                  onAddRow={() =>
+                    setClientRequestedScheduleRows((current) => [
+                      ...current,
+                      createEmptyScheduleRow(),
+                    ])
+                  }
+                />
+              )}
 
               <Button type="submit" disabled={isSaving || isLoadingInitialData}>
                 {isSaving
