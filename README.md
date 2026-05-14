@@ -2,7 +2,7 @@
 
 Full-stack scheduler app.
 
-- `frontend/`: React + Vite + Tailwind
+- `frontend/`: React + Vite + Tailwind + ShadCN UI
 - `backend/`: Express + Better Auth + Drizzle
 - `docker-compose.yml`: local Postgres DB
 

@@ -1,14 +1,36 @@
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq, isNull, sql } from "drizzle-orm";
 
 import { db } from "../../db/index.js";
 import { client } from "../../db/schema.js";
+import type { PaginationQuery } from "../shared/pagination.schema.js";
 import type { CreateClientInput, UpdateClientInput } from "./client.schema.js";
 
-export const listClients = async () => {
-  return db.query.client.findMany({
-    where: isNull(client.deletedAt),
+export const listClients = async ({ page, pageSize }: PaginationQuery) => {
+  const offset = (page - 1) * pageSize;
+  const whereClause = isNull(client.deletedAt);
+
+  const items = await db.query.client.findMany({
+    where: whereClause,
     orderBy: (table, { asc }) => [asc(table.lastName), asc(table.firstName)],
+    limit: pageSize,
+    offset,
   });
+
+  const [countRow] = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(client)
+    .where(whereClause);
+
+  const total = Number(countRow?.count ?? 0);
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+
+  return {
+    items,
+    page,
+    pageSize,
+    total,
+    totalPages,
+  };
 };
 
 export const getClientById = async (id: string) => {
