@@ -173,6 +173,20 @@ export const PeopleTableSection = ({ entityKind }: PeopleTableSectionProps) => {
                         >
                           Edit
                         </Button>
+                        {entityKind === "clients" ? (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() =>
+                              void navigate(
+                                `/${entityKind}/${row.id}/assign-schedule`,
+                              )
+                            }
+                          >
+                            Assign
+                          </Button>
+                        ) : null}
                         <Button
                           type="button"
                           variant="destructive"

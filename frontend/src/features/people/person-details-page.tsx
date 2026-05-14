@@ -1,6 +1,11 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
+import {
+  AssignedScheduleSection,
+  type AssignedScheduleRow,
+} from "@/features/people/assigned-schedule-section";
+import { RequestedClientScheduleSection } from "@/features/people/requested-client-schedule-section";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { API_BASE_URL } from "@/lib/api";
 import { getErrorMessage } from "@/lib/errors";
@@ -8,12 +13,14 @@ import {
   parseClientRequestedSchedule,
   parseEmployeeRequestedSchedule,
 } from "@/features/people/person-details-schedule";
-import {
-  dayLabelByValue,
-  formatDisplayTimeFromTwentyFour,
-  sortDayValues,
-} from "@/lib/schedule";
-import { type EntityKind, type PersonEntity } from "@/types/people";
+import { dayLabelByValue, sortDayValues } from "@/lib/schedule";
+import { useScheduleWeekContext } from "@/lib/use-schedule-week-context";
+import type {
+  ClientAssignedScheduleResponse,
+  EmployeeAssignedScheduleResponse,
+  EntityKind,
+  PersonEntity,
+} from "@/types/people";
 
 const getEntityLabel = (entityKind: EntityKind) =>
   entityKind === "clients" ? "Client" : "Employee";
@@ -26,7 +33,17 @@ export const PersonDetailsPage = ({ entityKind }: PersonDetailsPageProps) => {
   const entityLabel = getEntityLabel(entityKind);
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
+  const { currentWeekOf, nextWeekOf } = useScheduleWeekContext();
   const [person, setPerson] = useState<PersonEntity | null>(null);
+  const [assignedClientCurrentSchedule, setAssignedClientCurrentSchedule] =
+    useState<ClientAssignedScheduleResponse["schedule"]>([]);
+  const [assignedClientNextSchedule, setAssignedClientNextSchedule] = useState<
+    ClientAssignedScheduleResponse["schedule"]
+  >([]);
+  const [assignedEmployeeCurrentSchedule, setAssignedEmployeeCurrentSchedule] =
+    useState<EmployeeAssignedScheduleResponse["schedule"]>([]);
+  const [assignedEmployeeNextSchedule, setAssignedEmployeeNextSchedule] =
+    useState<EmployeeAssignedScheduleResponse["schedule"]>([]);
   const [error, setError] = useState<string | null>(
     id ? null : `${entityLabel} id is missing`,
   );
@@ -40,16 +57,50 @@ export const PersonDetailsPage = ({ entityKind }: PersonDetailsPageProps) => {
     const loadPerson = async () => {
       setError(null);
       try {
-        const response = await fetch(
-          `${API_BASE_URL}/api/${entityKind}/${id}`,
-          {
-            credentials: "include",
-          },
-        );
-        if (!response.ok) {
+        const [personResponse, assignedCurrentResponse, assignedNextResponse] =
+          await Promise.all([
+            fetch(`${API_BASE_URL}/api/${entityKind}/${id}`, {
+              credentials: "include",
+            }),
+            fetch(
+              `${API_BASE_URL}/api/${entityKind}/${id}/assigned-schedule?${new URLSearchParams({ weekOf: currentWeekOf }).toString()}`,
+              {
+                credentials: "include",
+              },
+            ),
+            fetch(
+              `${API_BASE_URL}/api/${entityKind}/${id}/assigned-schedule?${new URLSearchParams({ weekOf: nextWeekOf }).toString()}`,
+              {
+                credentials: "include",
+              },
+            ),
+          ]);
+
+        if (!personResponse.ok) {
           throw new Error(`Failed to load ${entityLabel}`);
         }
-        setPerson((await response.json()) as PersonEntity);
+        if (!assignedCurrentResponse.ok || !assignedNextResponse.ok) {
+          throw new Error(
+            `Failed to load assigned ${entityLabel.toLowerCase()} schedule`,
+          );
+        }
+
+        setPerson((await personResponse.json()) as PersonEntity);
+        if (entityKind === "clients") {
+          const currentPayload =
+            (await assignedCurrentResponse.json()) as ClientAssignedScheduleResponse;
+          const nextPayload =
+            (await assignedNextResponse.json()) as ClientAssignedScheduleResponse;
+          setAssignedClientCurrentSchedule(currentPayload.schedule);
+          setAssignedClientNextSchedule(nextPayload.schedule);
+        } else {
+          const currentPayload =
+            (await assignedCurrentResponse.json()) as EmployeeAssignedScheduleResponse;
+          const nextPayload =
+            (await assignedNextResponse.json()) as EmployeeAssignedScheduleResponse;
+          setAssignedEmployeeCurrentSchedule(currentPayload.schedule);
+          setAssignedEmployeeNextSchedule(nextPayload.schedule);
+        }
       } catch (loadError) {
         setError(getErrorMessage(loadError));
       } finally {
@@ -58,7 +109,7 @@ export const PersonDetailsPage = ({ entityKind }: PersonDetailsPageProps) => {
     };
 
     void loadPerson();
-  }, [entityKind, entityLabel, id]);
+  }, [currentWeekOf, entityKind, entityLabel, id, nextWeekOf]);
 
   const requestedEmployeeDays =
     person && entityKind === "employees"
@@ -69,6 +120,30 @@ export const PersonDetailsPage = ({ entityKind }: PersonDetailsPageProps) => {
     person && entityKind === "clients"
       ? parseClientRequestedSchedule(person.requestedSchedule)
       : [];
+
+  const toClientAssignedRows = (
+    entries: ClientAssignedScheduleResponse["schedule"],
+  ): AssignedScheduleRow[] =>
+    entries.map((entry) => ({
+      key: `${entry.dayOfWeek}-${entry.startTime}-${entry.endTime}-${entry.employeeId}`,
+      dayOfWeek: entry.dayOfWeek,
+      startTime: entry.startTime,
+      endTime: entry.endTime,
+      assigneeId: entry.employeeId,
+      assigneeName: entry.employeeName,
+    }));
+
+  const toEmployeeAssignedRows = (
+    entries: EmployeeAssignedScheduleResponse["schedule"],
+  ): AssignedScheduleRow[] =>
+    entries.map((entry) => ({
+      key: `${entry.dayOfWeek}-${entry.startTime}-${entry.endTime}-${entry.clientId}`,
+      dayOfWeek: entry.dayOfWeek,
+      startTime: entry.startTime,
+      endTime: entry.endTime,
+      assigneeId: entry.clientId,
+      assigneeName: entry.clientName,
+    }));
 
   return (
     <main className="min-h-screen bg-background p-4 text-foreground">
@@ -146,33 +221,80 @@ export const PersonDetailsPage = ({ entityKind }: PersonDetailsPageProps) => {
                   ) : null}
 
                   {entityKind === "clients" ? (
-                    requestedClientSchedule.length > 0 ? (
-                      <div className="grid gap-1 text-sm">
-                        <div className="grid grid-cols-[1.2fr_1fr_1fr] gap-2 border-b pb-1 font-medium text-muted-foreground">
-                          <p>Day</p>
-                          <p>Start Time</p>
-                          <p>End Time</p>
-                        </div>
-                        {requestedClientSchedule.map((entry) => (
-                          <div
-                            key={`${entry.dayOfWeek}-${entry.startTime}-${entry.endTime}`}
-                            className="grid grid-cols-[1.2fr_1fr_1fr] gap-2"
-                          >
-                            <p>{dayLabelByValue[entry.dayOfWeek]}</p>
-                            <p>
-                              {formatDisplayTimeFromTwentyFour(entry.startTime)}
-                            </p>
-                            <p>
-                              {formatDisplayTimeFromTwentyFour(entry.endTime)}
-                            </p>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <p className="text-sm text-muted-foreground">
-                        No requested schedule set.
-                      </p>
-                    )
+                    <RequestedClientScheduleSection
+                      entries={requestedClientSchedule}
+                      emptyMessage="No requested schedule set."
+                    />
+                  ) : null}
+                </div>
+
+                <div className="grid gap-3 rounded-md border p-4">
+                  <div className="flex items-center justify-between">
+                    <h3 className="font-semibold">Assigned Schedules</h3>
+                    {entityKind === "clients" && id ? (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() =>
+                          void navigate(`/clients/${id}/assign-schedule`)
+                        }
+                      >
+                        Edit next week assignments
+                      </Button>
+                    ) : null}
+                  </div>
+
+                  {entityKind === "clients" ? (
+                    <AssignedScheduleSection
+                      heading={`This Week (${currentWeekOf})`}
+                      assigneeLabel="Employee"
+                      emptyMessage="This Week has no assigned schedule."
+                      rows={toClientAssignedRows(assignedClientCurrentSchedule)}
+                      onAssigneeClick={(employeeId) =>
+                        void navigate(`/employees/${employeeId}`)
+                      }
+                    />
+                  ) : null}
+
+                  {entityKind === "clients" ? (
+                    <AssignedScheduleSection
+                      heading={`Next Week (${nextWeekOf})`}
+                      assigneeLabel="Employee"
+                      emptyMessage="Next week has no assigned schedule yet."
+                      rows={toClientAssignedRows(assignedClientNextSchedule)}
+                      onAssigneeClick={(employeeId) =>
+                        void navigate(`/employees/${employeeId}`)
+                      }
+                    />
+                  ) : null}
+
+                  {entityKind === "employees" ? (
+                    <AssignedScheduleSection
+                      heading={`This Week (${currentWeekOf})`}
+                      assigneeLabel="Client"
+                      emptyMessage="This Week has no assigned schedule."
+                      rows={toEmployeeAssignedRows(
+                        assignedEmployeeCurrentSchedule,
+                      )}
+                      onAssigneeClick={(clientId) =>
+                        void navigate(`/clients/${clientId}`)
+                      }
+                    />
+                  ) : null}
+
+                  {entityKind === "employees" ? (
+                    <AssignedScheduleSection
+                      heading={`Next Week (${nextWeekOf})`}
+                      assigneeLabel="Client"
+                      emptyMessage="Next week has no assigned schedule yet."
+                      rows={toEmployeeAssignedRows(
+                        assignedEmployeeNextSchedule,
+                      )}
+                      onAssigneeClick={(clientId) =>
+                        void navigate(`/clients/${clientId}`)
+                      }
+                    />
                   ) : null}
                 </div>
               </div>
